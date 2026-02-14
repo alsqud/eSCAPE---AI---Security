@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>eSCAPE - AI 보안 플랫폼</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <style>
+    :root{
+      --bg: #f4f6f8; --kosis-mint: #26a69a; --kosis-grad-start: #26a69a; --kosis-grad-end: #00897b;
+      --panel: #ffffff; --line: #e2e8f0; --text: #1e293b; --muted: #64748b; --accent: #26a69a; --radius: 16px;
+      --user-msg: #26a69a; --ai-msg: #f1f5f9;
+    }
+    *{box-sizing:border-box}
+    body{ margin:0; font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; background: var(--bg); color:var(--text); min-height:100dvh; display:flex; flex-direction:column; }
+    a{color:inherit}
+    
+    /* [1] 헤더(메뉴바): 상단 고정 & 배경색 적용 */
+    header {
+        background: linear-gradient(90deg, var(--kosis-grad-start), var(--kosis-grad-end)) !important;
+        box-shadow: 0 1px 10px rgba(0,0,0,0.1) !important;
+        position: fixed; /* 상단 고정 */
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 75px; 
+        z-index: 1000;
+        display: flex; 
+        align-items: center; 
+        border-bottom: 1px solid rgba(255,255,255,0.15); 
+    }
+    
+    .wrap{width: 94%; max-width: 1500px; margin:0 auto; padding:20px;}
+    .topbar{ display:flex; align-items:center; justify-content:space-between; width: 100%; }
+    
+    .nav-text, .brand, .auth-link { text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+    .brand{ display:flex; align-items:center; gap:12px; font-weight:800; letter-spacing:.3px; color: white; cursor: pointer; min-width: 280px; }
+    .nav-center { flex: 1; display: flex; justify-content: center; gap: 45px; }
+    .nav-text { background: transparent; border: none; color: rgba(255,255,255,0.9); font-size: 19px; font-weight: 700; cursor: pointer; padding: 12px 15px; position: relative; transition: all 0.2s; font-family: inherit; }
+    .nav-text:hover, .nav-text.active { color: #ffffff; text-shadow: 0 0 12px rgba(255,255,255,0.5); }
+    .nav-text.active::after { content: ''; position: absolute; bottom: 0; left: 15px; right: 15px; height: 4px; background: white; border-radius: 2px; }
+    .nav-right { display: flex; align-items: center; justify-content: flex-end; gap: 15px; min-width: 280px; font-size: 14px; color: white; font-weight: 500; }
+    .auth-link { cursor: pointer; background: none; border: none; color: white; font-size: 14px; padding: 0; font-family: inherit; }
+    .auth-link:hover { text-decoration: underline; }
+    .nav-divider { opacity: 0.5; font-size: 12px; }
+
+    /* [2] 메인 컨텐츠 영역: 헤더 높이만큼 아래로 밀어줌 */
+    main {
+        flex: 1;
+        padding-bottom: 50px;
+        padding-top: 95px !important; /* 헤더(75px) + 여백(20px) = 95px */
+    }
+
+    /* [3] 메인 화면용 확장 헤더 (통계청 스타일) */
+    .hero-extended {
+        background: linear-gradient(135deg, #26a69a 0%, #00695c 100%) !important;
+        color: white !important;
+        width: 100vw;
+        position: relative;
+        left: 50%;
+        right: 50%;
+        margin-left: -50vw;
+        margin-right: -50vw;
+        /* 헤더 높이만큼 다시 위로 올려서 배경 이어지게 함 */
+        margin-top: -95px; 
+        padding-top: 130px; 
+        padding-bottom: 50px;
+        border-radius: 0 0 50px 50px;
+        display: flex;
+        flex-direction: column;
+        align-items: center; 
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        margin-bottom: 40px;
+    }
+
+    .hero-header { width: 90%; max-width: 1400px; text-align: left; margin-bottom: 30px; }
+    .hero-header h1 { font-size: 34px; font-weight: 800; margin: 0; }
+    .hero-header p { font-size: 16px; opacity: 0.9; margin-top: 8px; }
+
+    .hero-stats-grid {
+        width: 90%;
+        max-width: 1400px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr); 
+        gap: 20px 0;
+    }
+
+    .stat-item {
+        background: transparent;
+        border: none;
+        padding: 10px 30px;
+        text-align: left;
+        border-left: 1px solid rgba(255,255,255,0.3); 
+    }
+    .hero-stats-grid .stat-item:nth-child(3n+1) { border-left: none; }
+
+    .stat-label { font-size: 14px; font-weight: 500; opacity: 0.8; margin-bottom: 6px; display: block; color: #e0f2f1; }
+    .stat-value { font-size: 24px; font-weight: 700; display: block; letter-spacing: -0.5px;}
+    .stat-value.danger { color: #ffccbc; }
+    .stat-value.safe { color: #b9f6ca; }
+
+    /* [4] 통계청 스타일 아이콘 그리드 */
+    .kosis-icon-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); 
+        gap: 15px;
+        margin-bottom: 30px;
+        padding: 0 10px;
+    }
+    .kosis-btn {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 20px 10px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    }
+    .kosis-btn:hover, .kosis-btn.active {
+        border-color: #26a69a;
+        background: #f0fdfa;
+        color: #00695c;
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(38, 166, 154, 0.2);
+    }
+    .kosis-btn-icon { font-size: 28px; display: block; margin-bottom: 5px; }
+    .kosis-btn-text { font-size: 14px; font-weight: 700; word-break: keep-all; }
+
+    /* 기본 스타일들 */
+    .grid{ display:grid; grid-template-columns: 1.1fr .9fr; gap:24px; margin-top:24px; }
+    @media (max-width: 920px){ .grid{grid-template-columns:1fr; } }
+    .card{ background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 4px 20px rgba(0,0,0,0.03); padding: 30px; margin-bottom: 24px; min-height: 450px; display: flex; flex-direction: column; }
+    .btn{ border:1px solid var(--line); background: #f1f5f9; color: var(--text); padding:12px 18px; border-radius: 10px; cursor:pointer; transition:.2s ease; font-weight:600; font-size:15px; }
+    .btn:hover{transform: translateY(-2px); background: #e2e8f0;}
+    .btn.primary{ border-color: transparent; background: var(--kosis-mint); color: white; box-shadow: 0 4px 10px rgba(38, 166, 154, 0.3); }
+    .sectionTitle{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding-bottom:14px; border-bottom:2.5px solid #f1f5f9; margin-bottom:20px; }
+    .sectionTitle h2{margin:0; font-size:20px; font-weight: 700; color: #334155;}
+    .badge{ font-size:12px; padding:4px 8px; border-radius:6px; background: #f1f5f9; color: var(--muted); font-weight: 600; }
+    .row{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+    label{ display:block; font-size:14px; color: var(--muted); margin-bottom:10px; font-weight: 600; }
+    input, select, textarea{ width:100%; padding:14px 16px; border-radius:12px; border:1px solid var(--line); background: #f8fafc; color: var(--text); outline:none; transition: border-color 0.2s; font-family: inherit; }
+    textarea{min-height:350px; resize:vertical; font-size: 16px;}
+    input:focus, select:focus, textarea:focus{ border-color: var(--kosis-mint); background: white; box-shadow: 0 0 0 3px rgba(38, 166, 154, 0.1); }
+    .inline{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+    .result-box { background: #f8fafc; border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 18px; }
+    .result-label { font-size: 13px; font-weight: 800; color: var(--kosis-mint); margin-bottom: 8px; display: block; letter-spacing: 0.5px; }
+    .result-content { font-size: 16px; color: var(--text); line-height: 1.6; }
+    .status-tag { display: inline-block; padding: 5px 10px; border-radius: 7px; font-size: 14px; font-weight: 800; color: white; margin-right: 5px; }
+    .tag-danger { background: #e11d48; } .tag-safe { background: #059669; } .tag-step { background: #26a69a; }
+    .divider{height:1px; background: var(--line); margin:20px 0;}
+    footer{ margin-top: auto; border-top:1px solid var(--line); background: white; padding: 20px 0; }
+    .small{font-size:13px; color: var(--muted); text-align: center;}
+    
+    /* 아카이브 슬라이더 & 필터 */
+    .year-slider { display: flex; align-items: center; justify-content: space-between; margin: 0 0 30px 0; padding: 20px; background: #f0fdfa; border-radius: 16px; border: 1px solid #ccfbf1; }
+    .year-label { font-weight: 800; color: #0f766e; font-size: 16px; min-width: 40px; text-align: center; }
+    input[type=range] { height: 6px; background: #cbd5e1; border-radius: 5px; outline: none; -webkit-appearance: none; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; background: #26a69a; border-radius: 50%; cursor: pointer; box-shadow: 0 0 0 4px rgba(38, 166, 154, 0.2); }
+    
+    .filterBar{ display:flex; flex-wrap:wrap; gap:10px; padding: 12px 0; border-bottom:1px solid var(--line); margin-bottom: 25px; justify-content: center; }
+    .tag{ border:1px solid transparent; background: #f1f5f9; padding:10px 16px; border-radius: 9px; font-size: 14px; font-weight: 700; cursor:pointer; color: var(--muted); transition:.2s; }
+    .tag.active{ background: var(--kosis-mint); color: white; box-shadow: 0 3px 8px rgba(38, 166, 154, 0.35); }
+    .flowBox{ position:relative; min-height: 400px; background: #f8fafc; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0; }
+    .flowTitle{ text-align:center; color: var(--text); font-weight: 800; font-size: 20px; margin-bottom: 30px; display: block;}
+    .flow-container { display: flex; align-items: center; justify-content: center; gap: 15px; flex-wrap: wrap; width: 100%; margin-bottom: 30px; }
+    .step-card { background: white; border: 1px solid var(--line); border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05); min-width: 120px; position: relative; cursor: pointer; animation: slideUp 0.5s forwards; opacity: 0; transform: translateY(20px); transition: transform 0.2s, border-color 0.2s; }
+    .step-card:hover { transform: translateY(-5px); border-color: var(--kosis-mint); }
+    .step-icon { font-size: 32px; margin-bottom: 10px; display: block; }
+    .step-title { font-weight: 700; font-size: 15px; word-break: keep-all; }
+    .step-arrow { color: var(--kosis-mint); font-size: 24px; font-weight: 800; animation: fadeIn 0.5s ease-out forwards; opacity: 0; animation-delay: 0.3s; }
+    .flow-desc { text-align: center; padding: 15px; background: #e0f2f1; border-radius: 12px; color: #00695c; font-weight: 600; animation: fadeIn 0.8s ease-out; }
+    .step-detail-container { padding: 20px; text-align: center; animation: fadeIn 0.4s ease-out; }
+    .detail-text { font-size: 18px; line-height: 1.8; color: var(--text); max-width: 800px; margin: 0 auto 35px auto; word-break: keep-all; font-weight: 500; }
+    .back-btn { padding: 10px 20px; background: white; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; font-weight: 600; color: var(--muted); transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+
+    /* 채팅 및 기타 */
+    .loader {border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid var(--kosis-mint); width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle;}
+    @keyframes spin {0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); }}
+    .chat-container { height: 400px; overflow-y: auto; background: #eef2f6; border-radius: 12px; padding: 20px; border: none; display: flex; flex-direction: column; gap: 12px; margin-top:10px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+    .chat-bubble { max-width: 75%; padding: 12px 16px; border-radius: 16px; font-size: 14px; line-height: 1.5; word-break: break-word; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .chat-bubble.ai { background: white; color: var(--text); align-self: flex-start; border-top-left-radius: 2px; }
+    .chat-bubble.user { background: var(--kosis-mint); align-self: flex-end; border-top-right-radius: 2px; color: #fff; }
+    .input-group { display: flex; gap: 10px; margin-top: 14px; }
+    #simScenario { color: #1e293b; font-weight: 700; font-size: 15px; border-radius: 10px; padding: 8px; border:1px solid #cbd5e1; }
+    #btnSend { white-space: nowrap; min-width: 80px; }
+    .auth-container { max-width: 480px; margin: 40px auto; background: white; padding: 40px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid var(--line); text-align: center; }
+    .auth-title { font-size: 24px; font-weight: 800; color: var(--text); margin-bottom: 30px; }
+    .auth-input { margin-bottom: 15px; text-align: left; }
+    .auth-input input { width: 100%; height: 48px; padding: 0 15px; border-radius: 8px; border: 1px solid var(--line); font-size: 15px; background: #f8fafc; }
+    .auth-btn { width: 100%; height: 50px; background: var(--kosis-mint); color: white; font-size: 16px; font-weight: 700; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; transition: 0.2s; }
+    .file-upload-box { margin-top: 15px; border: 2px dashed #cbd5e1; border-radius: 10px; padding: 20px; text-align: center; background: #f8fafc; cursor: pointer; transition: 0.2s; }
+    
+    .view{display:none; animation: fadeIn 0.4s ease-out;}
+    .view.active{display:block;}
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+
+<body>
+<header>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand" onclick="showView('home')">
+        <div>
+          <div style="font-size:22px;">eSCAPE</div>
+          <div style="font-size:13px; opacity:0.9; margin-top:3px;">스캠 지형 아카이브 · AI 프로파일링</div>
+        </div>
+      </div>
+      <nav class="nav-center">
+        <button class="nav-text" data-nav="archive" onclick="showView('archive')">스캠 지형 아카이브</button>
+        <button class="nav-text" data-nav="ai" onclick="showView('ai')">AI 프로파일링</button>
+        <button class="nav-text" data-nav="simulate" onclick="showView('simulate')">피싱 모의체험</button> 
+      </nav>
+      <div class="nav-right" id="navAuthArea">
+        <button class="auth-link" onclick="showAuth('login')">로그인</button>
+        <span class="nav-divider">|</span>
+        <button class="auth-link" onclick="showAuth('signup')">회원가입</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="home" class="view active">
+    
+    <div class="hero-extended">
+      <div class="hero-header">
+        <h1>오늘의 스캠 지형 (Live)</h1>
+        <p>실시간 수집 데이터를 기반으로 한 AI 보안 현황판</p>
+      </div>
+      <div class="hero-stats-grid">
+        <div class="stat-item">
+          <span class="stat-label">🚨 현재 경보 단계</span>
+          <span class="stat-value danger">심각 (Red)</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">🔥 실시간 급상승 키워드</span>
+          <span class="stat-value">부고장, 청첩장</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">💬 최다 신고 접수</span>
+          <span class="stat-value">메신저 피싱</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">🛡️ AI 탐지 시스템</span>
+          <span class="stat-value safe">정상 가동 중</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">⚠️ 주요 공격 타겟</span>
+          <span class="stat-value">고령층, 사회초년생</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">📉 피해 예방 추세</span>
+          <span class="stat-value">전주 대비 감소</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 40px; max-width: 1400px; margin-left: auto; margin-right: auto;">
+        
+        <h3 style="text-align:center; color:#475569; margin-bottom:20px; font-weight:700;">
+            알고 싶은 범죄 유형을 선택하세요
+        </h3>
+
+        <div class="kosis-icon-grid">
+            <div class="kosis-btn active" onclick="renderFlow('romance'); highlightBtn(this)">
+                <span class="kosis-btn-icon">💘</span><span class="kosis-btn-text">로맨스스캠</span>
+            </div>
+            <div class="kosis-btn" onclick="renderFlow('voice'); highlightBtn(this)">
+                <span class="kosis-btn-icon">📞</span><span class="kosis-btn-text">보이스피싱</span>
+            </div>
+            <div class="kosis-btn" onclick="renderFlow('messenger'); highlightBtn(this)">
+                <span class="kosis-btn-icon">📱</span><span class="kosis-btn-text">메신저피싱</span>
+            </div>
+            <div class="kosis-btn" onclick="renderFlow('bodycam'); highlightBtn(this)">
+                <span class="kosis-btn-icon">📹</span><span class="kosis-btn-text">몸캠피싱</span>
+            </div>
+            <div class="kosis-btn" onclick="renderFlow('site'); highlightBtn(this)">
+                <span class="kosis-btn-icon">💻</span><span class="kosis-btn-text">피싱사이트</span>
+            </div>
+            <div class="kosis-btn" onclick="renderFlow('deepfake'); highlightBtn(this)">
+                <span class="kosis-btn-icon">🤖</span><span class="kosis-btn-text">딥페이크</span>
+            </div>
+            <div class="kosis-btn" onclick="renderFlow('loan'); highlightBtn(this)">
+                <span class="kosis-btn-icon">💰</span><span class="kosis-btn-text">대출빙자</span>
+            </div>
+            <div class="kosis-btn" onclick="renderFlow('invest'); highlightBtn(this)">
+                <span class="kosis-btn-icon">📈</span><span class="kosis-btn-text">투자리딩방</span>
+            </div>
+            <div class="kosis-btn" onclick="renderFlow('smishing'); highlightBtn(this)">
+                <span class="kosis-btn-icon">📩</span><span class="kosis-btn-text">스미싱</span>
+            </div>
+        </div>
+
+        <div class="card flowBox" style="min-height: 400px;">
+          <div id="flowTitleText" style="text-align:center; font-weight:800; font-size:22px; margin-bottom:30px; color:#1e293b;">
+            로맨스스캠 전개 흐름
+          </div>
+          <div id="flowRenderArea"></div>
+        </div>
+    </div>
+  </section>
+
+  <section id="archive" class="view">
+    <div class="card">
+        <div class="sectionTitle">
+            <h2>📂 스캠 지형 아카이브</h2>
+            <span class="badge">History & Flows</span>
+        </div>
+
+        <div class="year-slider" style="gap: 15px; align-items: center; margin-bottom: 20px;">
+            <span class="year-label">1990</span>
+            <input type="range" id="archiveYearInput" min="1990" max="2026" value="2026" 
+                   style="flex:1; cursor: pointer; accent-color: #26a69a;" 
+                   oninput="handleYearChange(this.value)">
+            <span class="year-label"><span id="displayYear">2026</span> (선택)</span>
+        </div>
+
+        <div id="yearInfoBox" style="background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 16px; padding: 25px; margin-bottom: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                <span id="yearEraBadge" style="background: #26a69a; color: white; padding: 5px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">2020년대</span>
+                <h4 id="yearSummaryTitle" style="margin: 0; color: #00695c; font-size: 19px; font-weight: 800;">초개인화 인공지능 범죄</h4>
+            </div>
+            
+            <div style="margin-bottom: 12px;">
+                <div id="yearKeywords" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    </div>
+            </div>
+
+            <p id="yearDescription" style="color: #334155; font-size: 15px; line-height: 1.6; margin-bottom: 18px; word-break: keep-all; font-weight: 500;">
+                AI 기술을 악용한 딥페이크, 스미싱 등 고도화된 기술 범죄가 주를 이룹니다.
+            </p>
+
+            <div style="background: white; border-left: 4px solid #26a69a; padding: 15px; border-radius: 4px; border: 1px solid #e2e8f0;">
+                <label style="font-size: 12px; color: #64748b; font-weight: 800; display: block; margin-bottom: 6px;">📄 실제 사례</label>
+                <div id="yearCaseExample" style="color: #1e293b; font-size: 14px; font-style: italic; line-height: 1.5;">
+                    "엄마, 나 폰 액정 깨져서 급하게 수리 맡겼어. 인증 필요하니까 내 민증 사진 좀 찍어서 보내줘."
+                </div>
+            </div>
+        </div>
+
+        <p style="text-align:center; color:#64748b; margin-bottom: 15px; font-weight:600; font-size: 14px;">
+            ▼ 위 시기에 유행한 주요 유형 (클릭하여 흐름 확인)
+        </p>
+
+        <div class="filterBar">
+            </div>
+
+        <div class="flowBox">
+          <div id="flowTitleText" style="text-align:center; font-weight:800; font-size:20px; margin-bottom:20px;">
+            유형을 선택해주세요
+          </div>
+          <div id="flowRenderArea"></div>
+        </div>
+    </div>
+  </section>
+
+  <section id="ai" class="view">
+    <div class="card">
+      <div class="sectionTitle"><h2>AI 프로파일링</h2><span class="badge">Case Structuring</span></div>
+      <div style="background: #f1f5f9; border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid #e2e8f0; color: #475569; font-size: 15px; line-height: 1.6;">
+            <strong>💡 AI 프로파일링이란?</strong><br>
+            당신이 받은 의심스러운 문자나 통화 내용, 그냥 넘기지 마세요.<br>
+            eSCAPE의 AI가 방대한 과거 피해 사례들과 대조하고, 9가지 정밀 단계로 꼼꼼하게 따져봅니다.<br>
+            이 메시지가 실제 범죄와 얼마나 비슷한지, 그래서 지금 얼마나 위험한 상황인지 명쾌하게 판별해 드립니다.
+        </div>
+      <div style="margin-top:12px;">
+        <label for="caseBody">사례 내용 (필수)</label>
+        <textarea id="caseBody" placeholder="의심스러운 문자 내용이나 통화 내용을 여기에 붙여넣으세요."></textarea>
+        <label for="fileUpload" class="file-upload-box">
+            <span class="file-upload-icon">📂</span>
+            <span class="file-upload-text" id="fileNameDisplay">이미지, 음성 파일 등을 이곳에 업로드하세요 (클릭)</span>
+            <input type="file" id="fileUpload" style="display:none;" onchange="handleFileSelect(this)">
+        </label>
+      </div>
+      <div class="inline" style="margin-top:10px;">
+        <button class="btn primary" type="button" onclick="requestAIAnalysis()" id="analyzeBtn">AI 분석 요청</button>
+        <button class="btn" type="button" onclick="resetAI()">초기화</button>
+      </div>
+      <div class="divider"></div>
+      <div id="aiLoading" style="display:none; text-align:center; padding:20px;">
+        <div class="loader"></div><p style="margin-top:10px; color:var(--muted);">AI 분석 중...</p>
+      </div>
+      <div id="aiResultContainer" style="display:none;">
+        <div class="row">
+          <div><label>요약</label><div id="resultSummary" class="status" style="width:100%; padding:12px;"></div></div>
+          <div><label>판단 결과</label><div class="inline" id="resultLabels"></div></div>
+        </div>
+        <div style="margin-top:12px;"><label>상세 분석</label><div id="resultStructure" class="status" style="width:100%; padding:12px; line-height:1.6;"></div></div>
+        <div style="margin-top:12px;"><label>⚠️ 대응 가이드</label><div id="resultWarning" class="status risk-high" style="width:100%; padding:12px; font-weight:bold;"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="simulate" class="view">
+    <div class="card">
+      <div class="sectionTitle"><h2>🎮 피싱 모의체험 훈련</h2><select id="simScenario" style="width: auto; padding: 6px; font-size:14px;"><option value="기관 사칭">👮 검찰청 사칭 (계좌 동결)</option><option value="자녀 사칭">👧 자녀 사칭 (액정 파손)</option><option value="로맨스 스캠">💘 로맨스 스캠 (환심 사기)</option><option value="대출 빙자">💰 저금리 대출 (선입금 요구)</option></select></div>
+      <p style="color:var(--muted); font-size:14px; margin-bottom:10px;">AI가 실제 피싱범처럼 연기합니다.</p>
+      <div class="chat-container" id="chatContainer">
+        <div class="chat-bubble ai">안녕하세요. 시뮬레이션을 시작하려면 시나리오를 선택하고 첫 메시지를 보내보세요.</div>
+      </div>
+      <div class="input-group">
+        <input type="text" id="chatInput" placeholder="답장을 입력하세요..." onkeypress="if(event.keyCode==13) sendChat()">
+        <button class="btn primary" onclick="sendChat()" id="btnSend">전송</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="auth" class="view">
+    <div id="loginForm" class="auth-container">
+        <div class="auth-title">ONE-ID 통합로그인</div>
+        <div class="auth-input"><label>아이디</label><input type="text" id="loginId" placeholder="아이디를 입력하세요"></div>
+        <div class="auth-input"><label>비밀번호</label><input type="password" id="loginPw" placeholder="비밀번호를 입력하세요"></div>
+        <button class="auth-btn" onclick="performLogin()">로그인</button>
+        <div class="auth-footer">아직 계정이 없으신가요? <span onclick="toggleAuthForm('signup')">회원가입</span></div>
+    </div>
+    <div id="signupForm" class="auth-container" style="display:none;">
+        <div class="auth-title">회원가입</div>
+        <div class="auth-input"><label>아이디</label><input type="text" placeholder="영문, 숫자 조합 6~20자리"></div>
+        <div class="auth-input"><label>비밀번호</label><input type="password" placeholder="비밀번호 입력"></div>
+        <div class="auth-input"><label>이름</label><input type="text" placeholder="실명 입력"></div>
+        <div class="auth-input"><label>이메일</label><input type="email" placeholder="example@email.com"></div>
+        <button class="auth-btn" onclick="performSignup()">가입하기</button>
+        <div class="auth-footer">이미 계정이 있으신가요? <span onclick="toggleAuthForm('login')">로그인</span></div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap"><div class="small">© <span id="y"></span> eSCAPE AI Security. All rights reserved.</div></div></footer>
+
+<script>
+  document.getElementById('y').textContent = new Date().getFullYear();
+  const views = ["home", "archive", "ai", "simulate", "auth"]; 
+  let isLoggedIn = false;
+  let selectedFile = null;
+
+  // 1. 파일 선택 함수
+  function handleFileSelect(input) {
+      if(input.files && input.files[0]) {
+          selectedFile = input.files[0]; 
+          const displayEl = document.getElementById('fileNameDisplay');
+          displayEl.innerText = `📄 ${selectedFile.name}`;
+          displayEl.style.color = "#26a69a"; 
+          displayEl.style.fontWeight = "bold";
+      }
+  }
+
+  // 2. 화면 전환 함수 (showView) - ★ 독립적으로 존재해야 함
+  function showView(id){
+    views.forEach(v => document.getElementById(v).classList.toggle('active', v === id));
+    document.querySelectorAll('.nav-text').forEach(btn => btn.classList.toggle('active', btn.dataset.nav === id));
+    window.scrollTo(0,0);
+  }
+
+  // 3. 로그인 화면 전환
+  function showAuth(type) { showView('auth'); toggleAuthForm(type); }
+
+  // 4. 통계청 스타일 버튼 활성화
+  function highlightBtn(el) {
+      document.querySelectorAll('.kosis-btn').forEach(b => b.classList.remove('active'));
+      el.classList.add('active');
+  }
+
+  // 5. 연도 슬라이더 변경 함수 - ★ showView 밖으로 꺼내서 독립시킴!
+  function handleYearChange(year) {
+      // 1. 연도 숫자 표시
+      document.getElementById('displayYear').innerText = year;
+
+      // 2. 시대별 데이터 가져오기 (10년 단위 매핑)
+      let eraKey = 1990;
+      if (year >= 2020) eraKey = 2020;
+      else if (year >= 2010) eraKey = 2010;
+      else if (year >= 2000) eraKey = 2000;
+
+      const data = eraData[eraKey];
+
+      // 3. 정보 박스 내용 업데이트 (스케치 요청 사항)
+      document.getElementById('yearEraBadge').innerText = data.era;
+      document.getElementById('yearSummaryTitle').innerText = data.title;
+      document.getElementById('yearDescription').innerText = data.desc;
+      document.getElementById('yearCaseExample').innerText = data.case;
+      
+      // 키워드 배지 만들기
+      const kwArea = document.getElementById('yearKeywords');
+      kwArea.innerHTML = data.keywords.map(kw => 
+          `<span style="background: #e0f2f1; color: #00695c; padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 700;">#${kw}</span>`
+      ).join('');
+
+      // 4. 하단 버튼 랜덤 섞기 (3~4개)
+      const allTypes = Object.keys(scamFlows);
+      const count = Math.floor(Math.random() * 2) + 3; 
+      const shuffled = allTypes.sort(() => 0.5 - Math.random());
+      const selected = shuffled.slice(0, count);
+
+      // 5. 버튼 다시 그리기
+      const filterBar = document.querySelector('#archive .filterBar');
+      if(filterBar) {
+          filterBar.innerHTML = selected.map((type, index) => {
+              const activeClass = index === 0 ? 'active' : '';
+              return `<span class="tag ${activeClass}" onclick="renderFlow('${type}'); activeTag(this)">${scamFlows[type].title}</span>`;
+          }).join('');
+          
+          // 첫 번째 걸로 흐름도 자동 갱신
+          renderFlow(selected[0]);
+      }
+  
+  // 기존 showView 함수는 이렇게 독립적으로 있어야 합니다.
+  function showView(id){
+    views.forEach(v => document.getElementById(v).classList.toggle('active', v === id));
+    document.querySelectorAll('.nav-text').forEach(btn => btn.classList.toggle('active', btn.dataset.nav === id));
+    window.scrollTo(0,0);
+  }
+    // 메인화면 초기화 로직은 필요없으므로 제거
+    window.scrollTo(0,0);
+  }
+  function showAuth(type) { showView('auth'); toggleAuthForm(type); }
+
+  // [추가] 통계청 스타일 아이콘 버튼 클릭 시 활성화 효과
+  function highlightBtn(el) {
+      document.querySelectorAll('.kosis-btn').forEach(b => b.classList.remove('active'));
+      el.classList.add('active');
+  }
+  const eraData = {
+      1990: {
+          era: "1990년대",
+          title: "단순 기망형 사기의 태동",
+          keywords: ["경품 당첨", "세금 환급", "ARS 사기"],
+          desc: "불특정 다수에게 전화를 걸어 세금을 환급해주거나 경품에 당첨되었다고 속여 ATM기기로 유인하는 초기 형태입니다.",
+          case: "'축하합니다! 백화점 경품 행사에 당첨되셨습니다. 제세공과금을 입금하시면 상품을 보내드립니다.'"
+      },
+      2000: {
+          era: "2000년대",
+          title: "공포심 유발 및 보이스피싱 본격화",
+          keywords: ["자녀 납치 빙자", "우체국 사칭", "계좌 안전 조치"],
+          desc: "가족을 납치했다며 공포심을 자극하거나, 수사기관을 사칭해 안전 계좌로 이체를 유도하는 방식이 급증했습니다.",
+          case: "'당신 아들을 데리고 있다. 지금 당장 1,000만원을 입금하지 않으면 손가락을 자르겠다.'"
+      },
+      2010: {
+          era: "2010년대",
+          title: "대출 빙자 및 정교한 사칭",
+          keywords: ["저금리 대환대출", "김민수 검사", "가짜 공문"],
+          desc: "경제적 어려움을 겪는 서민들에게 정부 지원 저금리 대출을 미끼로 접근하거나, 위조된 공문을 사용해 신뢰를 얻습니다.",
+          case: "'서울중앙지검입니다. 귀하의 계좌가 범죄 자금 세탁에 연루되어 조사가 필요합니다.'"
+      },
+      2020: {
+          era: "2020년대",
+          title: "초개인화 & AI 기술 범죄",
+          keywords: ["딥페이크", "로맨스스캠", "부고/청첩장 스미싱"],
+          desc: "AI로 목소리나 얼굴을 합성(딥페이크)하거나, 지인의 부고/청첩장을 가장한 악성 링크(스미싱)로 정보를 탈취합니다.",
+          case: "'(딸 목소리로) 아빠, 나 폰 잃어버려서 급한데 편의점 가서 기프트카드 좀 사서 보내줘.'"
+      }
+  };
+  // [데이터] 상세 설명 텍스트
+  const scamFlows = {
+    "voice": { title: "보이스피싱", desc: "수사기관/금융권 사칭, 심리적 압박, 제3자 접촉 차단이 핵심입니다.", steps: ["준비", "접촉", "신뢰", "고립", "행동통제", "탈취"], icons: ["📝", "📞", "🤝", "🔒", "🎮", "💸"], details: ["불법 거래된 개인정보(DB)를 구매하고, 검찰/경찰/은행원 사칭 시나리오를 작성합니다.", "070 번호를 010으로 변작하여 피해자에게 전화를 걸고, 수사기관을 사칭해 긴장감을 조성합니다.", "위조된 공문이나 신분증 사진을 전송하여 피해자가 수사관임을 믿게 만듭니다.", "보안 유지를 핑계로 주변(가족, 은행창구 직원)과의 대화를 차단하고 전화를 끊지 못하게 합니다.", "악성 앱 설치를 유도하여 휴대폰을 제어하거나, 판단력을 흐리게 하여 지시대로 움직이게 합니다.", "안전 계좌 이체, 현금 전달, 상품권 핀번호 전송 등을 통해 자금을 탈취합니다."] },
+    "messenger": { title: "메신저피싱", desc: "카톡/SNS 활용, 가족/지인 사칭(폰 고장 등)하여 긴급 송금을 요청합니다.", steps: ["준비", "접촉", "신뢰(지인)", "정보수집", "탈취"], icons: ["📝", "📱", "👨‍👩‍👧", "🕵️", "💸"], details: ["포털 사이트 해킹 등을 통해 피해자 지인의 프로필 사진과 말투를 분석합니다.", "새로운 번호나 카톡 계정으로 '엄마 나 폰 고장났어'라며 접근합니다.", "급한 상황(액정 수리비, 문화상품권)을 연출하여 의심할 틈을 주지 않고 부모 자식 관계를 이용합니다.", "결제나 인증을 위해 신분증 사진이나 신용카드 번호, 비밀번호를 요구합니다.", "대포 통장으로 이체받거나, 원격 제어 앱을 설치해 직접 자금을 빼갑니다."] },
+    "site": { title: "피싱사이트", desc: "가짜 홈페이지로 유도하여 보안카드 등 금융정보 입력을 유도합니다.", steps: ["준비", "접촉", "탐색", "정보수집", "탈취"], icons: ["💻", "🔗", "🔍", "⌨️", "💸"], details: ["실제 정부기관, 은행, 포털과 똑같이 생긴 가짜 웹사이트를 제작합니다.", "문자(URL 포함)나 이메일을 통해 '보안 승급', '저금리 대출' 미끼로 접속을 유도합니다.", "피해자가 가짜 사이트를 진짜로 오인하고 메뉴를 클릭하며 탐색하게 만듭니다.", "로그인 정보, 보안카드 번호, 계좌 비밀번호 등 민감한 금융 정보를 입력하게 합니다.", "수집된 정보를 이용해 실시간으로 자금을 이체하거나 소액 결제를 진행합니다."] },
+    "bodycam": { title: "몸캠피싱", desc: "악성 앱 설치 유도 후 연락처 탈취, 녹화 영상을 유포하겠다고 협박합니다.", steps: ["준비", "접촉", "신뢰", "기기제어", "정보수집", "행동통제", "탈취"], icons: ["📹", "💬", "❤️", "📲", "📂", "🤬", "💸"], details: ["랜덤 채팅 앱이나 SNS에서 여성(혹은 남성)으로 가장한 프로필을 생성합니다.", "영상 통화를 제안하며 피해자에게 접근합니다.", "친밀감을 쌓으며 서로의 알몸이나 음란 행위를 보여주자고 유도합니다.", "화질 개선, 오디오 오류 등을 핑계로 악성 파일(APK) 설치를 유도합니다.", "설치된 앱을 통해 피해자의 연락처(가족, 직장동료 등)를 모두 탈취합니다.", "영상을 녹화한 뒤, 지인들에게 유포하겠다고 협박하며 심리적으로 압박합니다.", "영상 삭제를 조건으로 거액의 돈을 송금하도록 강요합니다."] },
+    "romance": { title: "로맨스스캠", desc: "SNS로 접근해 장기간 신뢰(연인 관계)를 쌓은 후, 교제/결혼을 빙자해 돈을 요구합니다.", steps: ["준비", "접촉", "신뢰(호감)", "행동통제", "탈취"], icons: ["🤵", "💌", "😍", "💍", "💸"], details: ["해외 파병 군인, 의사, 재력가 등 매력적인 가짜 프로필을 생성합니다.", "SNS(인스타, 페북) DM이나 데이팅 앱을 통해 자연스럽게 말을 겁니다.", "매일 연락하며 연인 관계를 형성하고, 영상 통화(딥페이크 등)로 신뢰를 쌓습니다.", "결혼 약속, 한국 방문 선물 배송비, 갑작스러운 사고 등을 핑계로 동정심을 유발합니다.", "관세, 수술비, 항공료 명목으로 지속적으로 금전을 요구하고 송금을 받습니다."] },
+    "deepfake": { title: "딥페이크", desc: "AI 합성 기술(목소리/얼굴)로 지인을 완벽히 사칭하여 신뢰도를 극대화합니다.", steps: ["준비", "접촉", "신뢰(기술)", "행동통제", "탈취"], icons: ["🤖", "🎥", "🗣️", "😨", "💸"], details: ["피해자 지인의 SNS 사진이나 목소리 샘플을 수집해 AI 모델을 학습시킵니다.", "영상 통화나 음성 전화를 걸어 지인인 척 접근합니다.", "화면에 보이는 얼굴이나 들리는 목소리가 지인과 똑같아 피해자가 즉시 신뢰하게 됩니다.", "급박한 상황(납치, 사고 등)을 연출하여 이성적인 판단을 못하게 막습니다.", "의심 없이 즉시 송금하도록 유도하여 자금을 탈취합니다."] },
+    "loan": { title: "대출빙자", desc: "저금리 대환대출 미끼로 각종 수수료 및 선입금 요구", steps: ["DB확보", "권유", "상담", "요구", "탈취"], icons: ["📂", "📞", "🗣️", "💰", "💸"], details: ["대출이 거절되었거나 고금리 대출 이용자들의 개인정보를 확보하여 범죄 타겟 리스트를 작성합니다.", "정부 지원금이나 시중 은행을 사칭하여 '저금리 전환 대출 확정'이라는 자극적인 문자를 대량으로 발송합니다.", "상담원을 사칭해 기존 대출 상환이 필요하다거나, 신용 등급 상향을 위한 거래 실적이 필요하다고 속입니다.", "보증금, 인지세, 전산 등록 비용 등 각종 명목의 선입금을 요구하며 입금 시 즉시 대출금이 실행된다고 안심시킵니다.", "피해자가 선입금을 완료하면 상담 중이던 모든 연락처를 차단하고 가로챈 돈을 세탁하여 사라집니다."] },
+    "invest": { title: "투자리딩방", desc: "고수익 보장 가짜 투자 사이트 유도 및 환전 거부", steps: ["홍보", "초대", "바람잡이", "인증", "입금", "차단"], icons: ["📈", "💬", "👥", "💵", "🏦", "🚫"], details: ["유튜브 광고나 문자를 통해 '수익률 500% 보장', '비밀 급등주 공개' 등의 허위 정보를 홍보합니다.", "피해자를 오픈 채팅방(리딩방)으로 초대하고, 수십 명의 바람잡이가 가짜 수익 인증샷을 올리며 분위기를 조장합니다.", "자신들이 자체 개발한 가짜 투자 사이트나 앱에 가입하게 하여 소액으로 수익이 나는 것처럼 수치를 조작해 보여줍니다.", "수익에 확신을 가진 피해자가 큰 액수의 투자금을 입금하게 유도하고, 계좌에 거액이 쌓이는 것처럼 화면을 연출합니다.", "피해자가 출금을 요청하면 세금, 수수료, 수사기관 조사 등을 핑계로 추가 입금을 요구하며 끝내 환전을 거부하고 강제 퇴장시킵니다."] },
+    "smishing": { title: "스미싱", desc: "택배/부고/청첩장 URL 클릭 유도 후 악성 앱 감염", steps: ["발송", "클릭", "감염", "제어", "소액결제"], icons: ["📩", "👆", "🦠", "📱", "💸"], details: ["주소지 불명 택배, 지인의 부고 알림, 청첩장 등 누구나 눌러볼 만한 일상적인 내용의 문자를 무작위로 발송합니다.", "문자에 포함된 단축 URL을 클릭하면 정식 앱 스토어가 아닌 사설 서버에서 악성 설치 파일(APK)이 내려받아집니다.", "설치된 악성 앱은 휴대폰의 모든 권한을 가로채고 문자 메시지, 연락처, 위치 정보, 통화 기록 등을 서버로 전송합니다.", "사기범은 피해자의 휴대폰을 원격으로 제어하거나 인증 번호를 가로채어 직접 금융 거래를 진행합니다.", "피해자 몰래 휴대폰 소액 결제를 한도까지 진행하거나, 비대면 계좌를 개설하여 자금을 빼돌리는 등 막대한 피해를 입힙니다."] }
+  };
+
+  function renderFlow(type) {
+    const data = scamFlows[type] || scamFlows['romance'];
+    // 메인화면 하단 흐름도 업데이트
+    const mainTitle = document.querySelector('#home #flowTitleText');
+    const mainArea = document.querySelector('#home #flowRenderArea');
+    if(mainTitle && mainArea) {
+        mainTitle.innerText = `${data.title} 전개 흐름`;
+        let html = `<div class="flow-container">`;
+        data.steps.forEach((step, index) => {
+            if (index > 0) html += `<div class="step-arrow">→</div>`;
+            html += `<div class="step-card" onclick="renderStepDetail('${type}', ${index})"><span class="step-icon">${data.icons[index] || '⚪'}</span><span class="step-title">${step}</span></div>`;
+        });
+        html += `</div><div class="flow-desc">💡 특징: ${data.desc}</div>`;
+        mainArea.innerHTML = html;
+    }
+
+    // 아카이브 화면 흐름도 업데이트 (기존 유지)
+    const archiveTitle = document.querySelector('#archive #flowTitleText');
+    const archiveArea = document.querySelector('#archive #flowRenderArea');
+    if(archiveTitle && archiveArea) {
+        archiveTitle.innerText = `${data.title} 전개 흐름`;
+        let html = `<div class="flow-container">`;
+        data.steps.forEach((step, index) => {
+            if (index > 0) html += `<div class="step-arrow">→</div>`;
+            html += `<div class="step-card" onclick="renderStepDetail('${type}', ${index})"><span class="step-icon">${data.icons[index] || '⚪'}</span><span class="step-title">${step}</span></div>`;
+        });
+        html += `</div><div class="flow-desc">💡 특징: ${data.desc}</div>`;
+        archiveArea.innerHTML = html;
+    }
+  }
+
+  function renderStepDetail(type, idx) {
+      const data = scamFlows[type];
+      const html = `<div class="step-detail-container"><div style="font-size:60px;">${data.icons[idx]}</div><h3>STEP ${idx+1}. ${data.steps[idx]}</h3><p class="detail-text">${data.details[idx]}</p><button class="back-btn" onclick="renderFlow('${type}')">← 돌아가기</button></div>`;
+      
+      const mainArea = document.querySelector('#home #flowRenderArea');
+      if(mainArea) mainArea.innerHTML = html;
+
+      const archiveArea = document.querySelector('#archive #flowRenderArea');
+      if(archiveArea) archiveArea.innerHTML = html;
+  }
+  
+  function activeTag(el) { document.querySelectorAll('.filterBar .tag').forEach(t=>t.classList.remove('active')); el.classList.add('active'); }
+
+  // 초기 실행
+  renderFlow('romance');
+
+  function resetAI() {
+      document.getElementById('caseBody').value = '';
+      document.getElementById('fileUpload').value = ''; 
+      selectedFile = null;
+      const displayEl = document.getElementById('fileNameDisplay');
+      displayEl.innerText = '이미지, 음성 파일 등을 이곳에 업로드하세요 (클릭)';
+      displayEl.style.color = '#64748b';
+      displayEl.style.fontWeight = 'normal';
+      document.getElementById('aiResultContainer').style.display = 'none';
+      document.getElementById('aiLoading').style.display = 'none';
+  }
+
+  async function requestAIAnalysis() {
+    const text = document.getElementById('caseBody').value;
+    
+    if (!text && !selectedFile) { 
+        alert("분석할 텍스트 내용을 입력하거나 파일을 업로드해주세요!"); 
+        return; 
+    }
+
+    const btn = document.getElementById('analyzeBtn');
+    const loadingDiv = document.getElementById('aiLoading');
+    const resultDiv = document.getElementById('aiResultContainer');
+
+    btn.disabled = true;
+    loadingDiv.style.display = 'block';
+    resultDiv.style.display = 'none';
+    
+    try {
+        const formData = new FormData();
+        formData.append('text', text); 
+        
+        if (selectedFile) {
+            formData.append('file', selectedFile); 
+        }
+
+        const response = await fetch('/analyze', {
+            method: 'POST',
+            body: formData 
+        });
+        
+        const data = await response.json();
+
+        if (data.error) throw new Error(data.error);
+
+        document.getElementById('resultSummary').innerText = data.summary || "요약 정보 없음";
+        
+        const labelsDiv = document.getElementById('resultLabels');
+        labelsDiv.innerHTML = "";
+        
+        // [수정 1] "일상 대화"나 "정상"이면 초록색(tag-safe), 아니면 빨간색(tag-danger)
+        let typeClass = "tag-danger"; // 기본은 빨강
+        let typeIcon = "🚨";
+        
+        // 백엔드에서 "일상 대화" 또는 "정상"이라고 오면 초록색으로 변경
+        if (data.scam_type && (data.scam_type.includes("일상") || data.scam_type.includes("정상"))) {
+            typeClass = "tag-safe";
+            typeIcon = "✅";
+        }
+
+        if (data.scam_type) {
+            labelsDiv.innerHTML += `<span class="status-tag ${typeClass}">${typeIcon} ${data.scam_type}</span>`;
+        }
+
+        // [수정 2] 위험도 점수에 따라 색상 변경 로직 추가
+        if (data.current_stage && data.current_stage !== "해당 없음") {
+            labelsDiv.innerHTML += `<span class="status-tag tag-step">STEP: ${data.current_stage}</span>`;
+        }
+        
+        const risk = Math.floor((data.scores?.risk_score || 0)); // 100을 곱하지 않고 원본 점수가 0~100이라면 그대로 씁니다. (백엔드 로직에 따라 다름)
+        // 만약 백엔드가 0.0 ~ 1.0을 준다면 아래 줄 사용:
+        // const risk = Math.floor((data.scores?.risk_score || 0) * 100);
+
+        // 위험도가 30점 미만이면 초록색(safe), 그 이상이면 빨간색(danger)
+        let riskClass = (risk < 30) ? "tag-safe" : "tag-danger";
+        
+        labelsDiv.innerHTML += `<span class="status-tag ${riskClass}">위험도: ${risk}%</span>`;
+
+        const structureDiv = document.getElementById('resultStructure');
+        let tacticsHtml = data.analysis?.detected_tactics?.map(t => `• ${t}`).join("<br>") || "-";
+        let evidenceHtml = data.analysis?.evidence_sentences?.map(e => `"${e}"`).join(", ") || "-";
+        
+        let fileInfoHtml = "";
+        if (selectedFile) {
+            fileInfoHtml = `<div style="margin-top:10px; padding:8px; background:#f0fdfa; color:#0f766e; border-radius:6px; font-size:0.9em;">📸 <strong>파일 분석 포함됨:</strong> ${selectedFile.name}</div><br>`;
+        }
+        
+        structureDiv.innerHTML = `
+    <strong>📂 과거 유사 사례 분석:</strong><br>
+    <div style="color: #0f766e; background: #f0fdfa; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ccfbf1;">
+        ${data.matched_case || "유사한 과거 사례를 찾을 수 없습니다."}
+    </div>
+    ${fileInfoHtml}
+    <strong>🕵️ 감지된 전술:</strong><br>${tacticsHtml}<br><br>
+    <strong>🔍 증거 문장:</strong><br>${evidenceHtml}
+`;
+
+        document.getElementById('resultWarning').innerHTML = `${data.warning_message}<br><span style="font-size:0.9em; opacity:0.8;">🔮 다음 행동: ${data.next_step_prediction}</span>`;
+
+    } catch (err) {
+        alert("오류: " + err.message);
+    } finally {
+        btn.disabled = false;
+        loadingDiv.style.display = 'none';
+        resultDiv.style.display = 'block';
+    }
+  }
+  let chatHistory = [];
+  async function sendChat() {
+    const input = document.getElementById('chatInput');
+    const msg = input.value;
+    if(!msg) return;
+
+    const container = document.getElementById('chatContainer');
+    container.innerHTML += `<div class="chat-bubble user">${msg}</div>`;
+    container.scrollTop = container.scrollHeight;
+    
+    input.value = "";
+    
+    if(typeof chatHistory === 'undefined') chatHistory = []; 
+    chatHistory.push({text: msg, isUser: true});
+
+    const scenario = document.getElementById('simScenario').value;
+    const btn = document.getElementById('btnSend');
+    btn.disabled = true;
+
+    try {
+      const res = await fetch('/simulate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          scenario: scenario,
+          message: msg,
+          history: chatHistory
+        })
+      });
+      const data = await res.json();
+      
+      container.innerHTML += `<div class="chat-bubble ai">${data.reply}</div>`;
+      chatHistory.push({text: data.reply, isUser: false});
+      container.scrollTop = container.scrollHeight;
+      
+    } catch(e) {
+      container.innerHTML += `<div class="chat-bubble ai">시스템 오류가 발생했습니다.</div>`;
+    } finally {
+      btn.disabled = false;
+      document.getElementById('chatInput').focus();
+    }
+  }
+
+  document.querySelectorAll('[data-nav]').forEach(el => {
+    el.addEventListener('click', (e) => { e.preventDefault(); const target = el.dataset.nav; if (views.includes(target)) showView(target); });
+  });
+  function toggleAuthForm(type) {
+      document.getElementById('loginForm').style.display = (type === 'login') ? 'block' : 'none';
+      document.getElementById('signupForm').style.display = (type === 'signup') ? 'block' : 'none';
+  }
+
+  // 2. 로그인 수행 (admin / 1234)
+  function performLogin() {
+      const id = document.getElementById('loginId').value;
+      const pw = document.getElementById('loginPw').value;
+
+      // 아이디/비번 확인 로직
+      if(id === 'admin' && pw === '1234') {
+          alert("관리자님, 환영합니다! (로그인 성공)");
+          isLoggedIn = true;
+          updateNavAfterLogin(); // 상단 메뉴 변경
+          showView('home'); // 메인으로 이동
+      } else {
+          alert("아이디 또는 비밀번호가 일치하지 않습니다.\n(Hint: admin / 1234)");
+      }
+  }
+
+  // 3. 회원가입 수행 (가짜 로직)
+  function performSignup() {
+      alert("가입이 완료되었습니다! (시연용)");
+      toggleAuthForm('login');
+  }
+
+  // 4. 로그인 성공 시 상단 메뉴 변경 (로그인 -> 로그아웃)
+  function updateNavAfterLogin() {
+      const navArea = document.getElementById('navAuthArea');
+      if(isLoggedIn) {
+          navArea.innerHTML = `<button class="auth-link" onclick="performLogout()">로그아웃</button>`;
+      } else {
+          // 원래대로 복구
+          navArea.innerHTML = `
+              <button class="auth-link" onclick="showAuth('login')">로그인</button>
+              <span class="nav-divider">|</span>
+              <button class="auth-link" onclick="showAuth('signup')">회원가입</button>
+          `;
+      }
+  }
+
+  // 5. 로그아웃 수행
+  function performLogout() {
+      isLoggedIn = false;
+      alert("로그아웃 되었습니다.");
+      updateNavAfterLogin();
+      showView('home');
+  }
+</script>
+</body>
+</html>
